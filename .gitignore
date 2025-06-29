@@ -1,0 +1,42 @@
+# Dependencies
+# Ignore the node_modules directory to avoid committing thousands of library files.
+# These should be installed by anyone who clones the repo using `npm install`.
+/node_modules
+
+# Build output
+# Your README mentions an `npm run build` command. This ignores the output directory.
+/build
+/dist
+
+# Log files
+# It's good practice to ignore log files as they are specific to your local machine.
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+# This is the most important part for protecting secrets.
+# Store your API keys and other secrets in these files and NEVER commit them.
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Firebase secrets
+# If you use a Firebase service account key, make sure its name is listed here.
+# serviceAccountKey.json
+.firebase/
+
+# IDEs and editor-specific files
+.vscode/
+.idea/
+
+# OS-generated files
+.DS_Store
+Thumbs.db
+
+# Test and coverage reports
+/coverage
