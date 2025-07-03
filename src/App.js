@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, onSnapshot, setDoc, addDoc, updateDoc, deleteDoc, collection, query, writeBatch } from 'firebase/firestore';
+// eslint-disable-next-line
 import { Plus, Users, Utensils, ThumbsUp, ThumbsDown, Search, Trash2, Pencil, X, Check, CalendarCheck, ArrowUp, ArrowDown, Sparkles, MoreVertical, Edit, Users2, Link as LinkIcon } from 'lucide-react';
 import { getAnalytics } from "firebase/analytics";
 
@@ -713,6 +714,17 @@ const App = () => {
                         </div>
                     </div>
                 </div>
+                <footer className="text-center mt-8 py-4 border-t border-gray-200 dark:border-gray-700">
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                        Have feedback or found a bug?{' '}
+                        <a
+                            href="https://github.com/zuccone/super-lunch-buddies/issues"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="underline hover:text-indigo-500 dark:hover:text-indigo-400"
+                        >Open an issue on GitHub</a>.
+                    </p>
+                </footer>
             </div>
             
             {showAddRestaurantModal && (
