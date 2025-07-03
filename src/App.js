@@ -121,6 +121,7 @@ const App = () => {
     const [groupName, setGroupName] = useState('');
     const [groupLocation, setGroupLocation] = useState('');
     const [editingGroup, setEditingGroup] = useState(null);
+    const [lastVisitedTooltip, setLastVisitedTooltip] = useState({ visible: false, data: null, x: 0, y: 0 });
     
     // Gemini API State & Shared Vibe
     const [lunchVibe, setLunchVibe] = useState('');
@@ -310,8 +311,8 @@ const App = () => {
     const sortedRestaurants = useMemo(() => {
         return [...restaurants].sort((a, b) => {
             if (sortConfig.key === 'lastVisited') {
-                const aDate = a.lastVisited ? new Date(a.lastVisited).getTime() : 0;
-                const bDate = b.lastVisited ? new Date(b.lastVisited).getTime() : 0;
+                const aDate = a.lastVisited?.[selectedGroupId] ? new Date(a.lastVisited[selectedGroupId]).getTime() : 0;
+                const bDate = b.lastVisited?.[selectedGroupId] ? new Date(b.lastVisited[selectedGroupId]).getTime() : 0;
                 if (sortConfig.direction === 'ascending') {
                     if (aDate === 0 && bDate !== 0) return -1;
                     if (bDate === 0 && aDate !== 0) return 1;
@@ -320,11 +321,12 @@ const App = () => {
             }
             return sortConfig.direction === 'ascending' ? a.rating - b.rating : b.rating - a.rating;
         });
-    }, [restaurants, sortConfig]);
+    }, [restaurants, sortConfig, selectedGroupId]);
 
     // --- Event Handlers ---
     const handleMouseMove = (e) => {
         if (tooltip.visible) setTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
+        if (lastVisitedTooltip.visible) setLastVisitedTooltip(prev => ({ ...prev, x: e.clientX, y: e.clientY }));
     };
 
     const handleMouseEnter = (e, restaurant) => {
@@ -335,6 +337,29 @@ const App = () => {
 
     const handleMouseLeave = () => {
         setTooltip({ visible: false, data: null, x: 0, y: 0 });
+    };
+
+    const handleLastVisitedMouseEnter = (e, restaurant) => {
+        const otherGroupsVisited = Object.entries(restaurant.lastVisited || {})
+            .filter(([groupId, date]) => groupId !== selectedGroupId && date)
+            .map(([groupId, date]) => {
+                const group = groups.find(g => g.id === groupId);
+                return { groupName: group ? group.name : 'Unknown Group', date };
+            })
+            .sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        if (otherGroupsVisited.length > 0) {
+            setLastVisitedTooltip({
+                visible: true,
+                data: otherGroupsVisited,
+                x: e.clientX,
+                y: e.clientY
+            });
+        }
+    };
+
+    const handleLastVisitedMouseLeave = () => {
+        setLastVisitedTooltip({ visible: false, data: null, x: 0, y: 0 });
     };
 
 
@@ -406,7 +431,7 @@ const App = () => {
         const aiDescription = await generateAIDescription(newRestaurantDesc);
         setIsGenerating(false);
 
-        const newRestaurant = { id: Date.now(), name: newRestaurantName.trim(), nickname: newRestaurantNickname.trim(), rating: 0, lastVisited: null, description: aiDescription, address: newRestaurantAddress };
+        const newRestaurant = { id: Date.now(), name: newRestaurantName.trim(), nickname: newRestaurantNickname.trim(), rating: 0, lastVisited: {}, description: aiDescription, address: newRestaurantAddress };
         await updateRestaurantsDoc([...restaurants, newRestaurant]);
         
         setNewRestaurantName('');
@@ -417,7 +442,13 @@ const App = () => {
     };
 
     const handleVisitToday = async (restaurantId) => {
-        const updatedRestaurants = restaurants.map(r => r.id === restaurantId ? { ...r, lastVisited: new Date().toISOString() } : r);
+        const updatedRestaurants = restaurants.map(r => {
+            if (r.id === restaurantId) {
+                const lastVisitedByGroup = (typeof r.lastVisited === 'object' && r.lastVisited !== null) ? r.lastVisited : {};
+                return { ...r, lastVisited: { ...lastVisitedByGroup, [selectedGroupId]: new Date().toISOString() } };
+            }
+            return r;
+        });
         await updateRestaurantsDoc(updatedRestaurants);
     };
 
@@ -538,6 +569,18 @@ const App = () => {
                     <p className="font-bold">{tooltip.data.name}</p>
                     {tooltip.data.address && <p className="text-xs text-gray-500 dark:text-gray-400">{tooltip.data.address}</p>}
                     <p className="mt-2 text-sm">{tooltip.data.description}</p>
+                </div>
+            )}
+            {lastVisitedTooltip.visible && lastVisitedTooltip.data && (
+                <div style={{ top: lastVisitedTooltip.y + 20, left: lastVisitedTooltip.x + 20, zIndex: 60 }} className="fixed p-3 bg-white dark:bg-gray-800 text-gray-900 dark:text-white rounded-lg shadow-xl max-w-xs pointer-events-none">
+                    <p className="font-bold text-sm mb-2">Last visited by other groups:</p>
+                    <ul className="space-y-1">
+                        {lastVisitedTooltip.data.map(({ groupName, date }) => (
+                            <li key={groupName} className="text-xs">
+                                <span className="font-semibold">{groupName}:</span> {formatDate(date).replace('Visited: ', '')}
+                            </li>
+                        ))}
+                    </ul>
                 </div>
             )}
             <div className="container mx-auto p-4 md:p-8 max-w-6xl">
@@ -679,16 +722,24 @@ const App = () => {
                         </div>
                         <div className="flex-grow grid grid-cols-1 md:grid-cols-2 gap-2 overflow-y-auto pr-2 custom-scrollbar min-h-0">
                            {filteredRestaurants.map((r) => (
-                                <div key={r.id} className="group relative flex flex-col p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700" onMouseEnter={(e) => handleMouseEnter(e, r)} onMouseLeave={handleMouseLeave}>
+                                <div key={r.id} className="group relative flex flex-col p-3 rounded-lg bg-gray-50 dark:bg-gray-700/50 hover:bg-gray-100 dark:hover:bg-gray-700">
                                     <div className="w-full flex justify-between items-start flex-grow">
                                         <div className="flex-grow">
                                             <div className="flex items-center gap-1.5">
                                                 <a href={`https://www.google.com/search?q=${encodeURIComponent(r.name + " " + r.address)}`} target="_blank" rel="noopener noreferrer" className="p-1 rounded-full hover:bg-gray-200 dark:hover:bg-gray-600">
                                                     <LinkIcon size={12} className="text-blue-500" />
                                                 </a>
-                                                <span className="text-md font-semibold dark:text-gray-200">{r.nickname || r.name}</span>
+                                                <span className="text-md font-semibold dark:text-gray-200"
+                                                    onMouseEnter={(e) => handleMouseEnter(e, r)}
+                                                    onMouseLeave={handleMouseLeave}>
+                                                    {r.nickname || r.name}
+                                                </span>
                                             </div>
-                                            <p className="text-xs text-gray-500 dark:text-gray-400">{formatDate(r.lastVisited)}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400"
+                                                onMouseEnter={(e) => handleLastVisitedMouseEnter(e, r)}
+                                                onMouseLeave={handleLastVisitedMouseLeave}>
+                                                {formatDate(r.lastVisited?.[selectedGroupId])}
+                                            </p>
                                         </div>
                                          <div className="flex items-center gap-2">
                                             <div className="flex flex-col items-center">
